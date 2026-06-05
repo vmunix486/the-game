@@ -1,0 +1,7 @@
+[gd_resource type="Environment" format=3 uid="uid://ble1qaekmqy4n"]
+
+[sub_resource type="Sky" id="Sky_n4y2n"]
+
+[resource]
+background_mode = 2
+sky = SubResource("Sky_n4y2n")
