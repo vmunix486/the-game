@@ -124,8 +124,9 @@ theme_override_fonts/font = ExtResource("8_gwcy2")
 theme_override_font_sizes/font_size = 32
 text = "Welcome to the game
 
-Use A & D To Move
-and Spacebar To Jump
+Use A & D To Move,
+Spacebar To Jump,
+Shift to slide.
 
 Go to the first level
 by going through the

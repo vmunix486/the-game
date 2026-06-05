@@ -2,17 +2,25 @@ extends CharacterBody2D
 
 # --------- VARIABLES ---------- #
 
-@export_category("Player Properties") # You can tweak these changes according to your likings
+@export_category("Player Properties")
 @export var move_speed : float = 400
 @export var jump_force : float = 600
 @export var gravity : float = 30
 @export var max_jump_count : int = 2
 var jump_count : int = 2
 
-@export_category("Toggle Functions") # Double jump feature is disable by default (Can be toggled from inspector)
+@export_category("Toggle Functions")
 @export var double_jump : = false
 
+@export_category("Slide Properties")  
+@export var slide_speed : float = 600  
+@export var slide_duration : float = 0.5 
+@export var slide_cooldown : float = 1.0 
+
 var is_grounded : bool = false
+var is_sliding : bool = false  
+var slide_timer : float = 0.0  
+var slide_cooldown_timer : float = 0.0  
 
 @onready var player_sprite = $AnimatedSprite2D
 @onready var spawn_point = %SpawnPoint
@@ -22,14 +30,18 @@ var is_grounded : bool = false
 # --------- BUILT-IN FUNCTIONS ---------- #
 
 func _process(_delta):
+	# Update slide timers
+	if slide_cooldown_timer > 0: 
+		slide_cooldown_timer -= _delta 
+	
 	# Calling functions
 	movement()
 	player_animations()
 	flip_player()
-	
+
 # --------- CUSTOM FUNCTIONS ---------- #
 
-# <-- Player Movement Code -->
+# Player Movement Code
 func movement():
 	# Gravity
 	if !is_on_floor():
@@ -38,13 +50,31 @@ func movement():
 		jump_count = max_jump_count
 	
 	handle_jumping()
+	handle_sliding() 
 	
 	# Move Player
 	var inputAxis = Input.get_axis("Left", "Right")
-	velocity = Vector2(inputAxis * move_speed, velocity.y)
+	
+	# Apply slide speed if sliding, otherwise normal speed
+	var current_speed = slide_speed if is_sliding else move_speed  
+	velocity = Vector2(inputAxis * current_speed, velocity.y)
 	move_and_slide()
 
-# Handles jumping functionality (double jump or single jump, can be toggled from inspector)
+# Handle sliding functionality 
+func handle_sliding(): 
+	if Input.is_action_just_pressed("Slide") and is_on_floor() and slide_cooldown_timer <= 0 and not is_sliding: 
+		is_sliding = true  
+		slide_timer = slide_duration  
+		particle_trails.emitting = true  
+	
+	if is_sliding:  
+		slide_timer -= get_physics_process_delta_time()  
+		if slide_timer <= 0:  
+			is_sliding = false 
+			slide_cooldown_timer = slide_cooldown  
+			particle_trails.emitting = false  
+
+# Handles jumping functionality
 func handle_jumping():
 	if Input.is_action_just_pressed("Jump"):
 		if is_on_floor() and !double_jump:
@@ -60,11 +90,12 @@ func jump():
 
 # Handle Player Animations
 func player_animations():
-	particle_trails.emitting = false
+	particle_trails.emitting = false if not is_sliding else true  
 	
 	if is_on_floor():
-		if abs(velocity.x) > 0:
-			# particle_trails.emitting = true
+		if is_sliding:  
+			player_sprite.play("Slide") 
+		elif abs(velocity.x) > 0:
 			particle_trails.emitting = false
 			player_sprite.play("Walk", 1.5)
 		else:
@@ -92,7 +123,7 @@ func death_tween():
 func respawn_tween():
 	var tween = create_tween()
 	tween.stop(); tween.play()
-	tween.tween_property(self, "scale", Vector2.ONE, 0.15) 
+	tween.tween_property(self, "scale", Vector2.ONE, 0.15)
 
 # --------- SIGNALS ---------- #
 
