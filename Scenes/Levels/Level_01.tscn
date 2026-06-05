@@ -125,8 +125,6 @@ theme_override_font_sizes/font_size = 32
 text = "Welcome to the game
 
 Use A & D To Move,
-Spacebar To Jump,
-Shift to slide.
 
 Go to the first level
 by going through the
@@ -151,7 +149,6 @@ from \"LevelFinishDoor\" Area"
 script = ExtResource("4_vgfkr")
 
 [node name="UserInterface" type="CanvasLayer" parent="." unique_id=1338791135]
-visible = false
 
 [node name="GameUI" type="Control" parent="UserInterface" unique_id=2121055529]
 layout_mode = 3
