@@ -17,10 +17,22 @@ var jump_count : int = 2
 @export var slide_duration : float = 0.5 
 @export var slide_cooldown : float = 1.0 
 
+@export_category("Dash Properties")  # NEW
+@export var dash_speed : float = 800  # NEW
+@export var dash_duration : float = 0.3  # NEW
+@export var dash_cooldown : float = 1.0  # NEW
+@export var max_dashes : int = 1  # NEW
+
 var is_grounded : bool = false
 var is_sliding : bool = false  
 var slide_timer : float = 0.0  
 var slide_cooldown_timer : float = 0.0  
+
+var is_dashing : bool = false  # NEW
+var dash_timer : float = 0.0  # NEW
+var dash_cooldown_timer : float = 0.0  # NEW
+var dash_count : int = 1  # NEW
+var dash_direction : Vector2 = Vector2.ZERO  # NEW
 
 @onready var player_sprite = $AnimatedSprite2D
 @onready var spawn_point = %SpawnPoint
@@ -34,6 +46,14 @@ func _process(_delta):
 	if slide_cooldown_timer > 0: 
 		slide_cooldown_timer -= _delta 
 	
+	# Update dash timers  # NEW
+	if dash_cooldown_timer > 0:  # NEW
+		dash_cooldown_timer -= _delta  # NEW
+	
+	# Reset dash count when grounded  # NEW
+	if is_on_floor():  # NEW
+		dash_count = max_dashes  # NEW
+	
 	# Calling functions
 	movement()
 	player_animations()
@@ -43,26 +63,35 @@ func _process(_delta):
 
 # Player Movement Code
 func movement():
-	# Gravity
-	if !is_on_floor():
+	# Gravity (disabled while dashing)  # MODIFIED
+	if !is_on_floor() and not is_dashing:  # MODIFIED
 		velocity.y += gravity
 	elif is_on_floor():
 		jump_count = max_jump_count
 	
 	handle_jumping()
-	handle_sliding() 
+	handle_sliding()
+	handle_dashing()  # NEW
 	
 	# Move Player
 	var inputAxis = Input.get_axis("Left", "Right")
 	
-	# Apply slide speed if sliding, otherwise normal speed
-	var current_speed = slide_speed if is_sliding else move_speed  
-	velocity = Vector2(inputAxis * current_speed, velocity.y)
+	# Apply appropriate speed based on current state
+	var current_speed = move_speed  # MODIFIED
+	if is_sliding:  # MODIFIED
+		current_speed = slide_speed
+	elif is_dashing:  # NEW
+		current_speed = 0  # Dash uses velocity directly  # NEW
+	
+	# Only apply input velocity if not dashing  # NEW
+	if not is_dashing:  # NEW
+		velocity = Vector2(inputAxis * current_speed, velocity.y)
+	
 	move_and_slide()
 
 # Handle sliding functionality 
 func handle_sliding(): 
-	if Input.is_action_just_pressed("Slide") and is_on_floor() and slide_cooldown_timer <= 0 and not is_sliding: 
+	if Input.is_action_just_pressed("Shift") and is_on_floor() and slide_cooldown_timer <= 0 and not is_sliding: 
 		is_sliding = true  
 		slide_timer = slide_duration  
 		particle_trails.emitting = true  
@@ -73,6 +102,35 @@ func handle_sliding():
 			is_sliding = false 
 			slide_cooldown_timer = slide_cooldown  
 			particle_trails.emitting = false  
+
+# Handle mid-air dashing  # NEW
+func handle_dashing():  # NEW
+	if Input.is_action_just_pressed("Shift") and dash_count > 0 and not is_dashing and not is_sliding:  # NEW
+		is_dashing = true  # NEW
+		dash_timer = dash_duration  # NEW
+		dash_count -= 1  # NEW
+		particle_trails.emitting = true  # NEW
+		
+		# Get dash direction from input  # NEW
+		var inputAxis = Input.get_axis("Left", "Right")  # NEW
+		if inputAxis != 0:  # NEW
+			dash_direction = Vector2(inputAxis, 0)  # NEW
+		else:  # NEW
+			# Dash in the direction the player is facing  # NEW
+			dash_direction = Vector2(-1 if player_sprite.flip_h else 1, 0)  # NEW
+		
+		AudioManager.jump_sfx.play()  # NEW (reuse jump sound or create dash_sfx)
+	
+	if is_dashing:  # NEW
+		# Apply dash velocity  # NEW
+		velocity = dash_direction * dash_speed  # NEW
+		dash_timer -= get_physics_process_delta_time()  # NEW
+		
+		if dash_timer <= 0:  # NEW
+			is_dashing = false  # NEW
+			dash_cooldown_timer = dash_cooldown  # NEW
+			particle_trails.emitting = false  # NEW
+			velocity = Vector2.ZERO  # Reset velocity after dash  # NEW
 
 # Handles jumping functionality
 func handle_jumping():
@@ -90,7 +148,7 @@ func jump():
 
 # Handle Player Animations
 func player_animations():
-	particle_trails.emitting = false if not is_sliding else true  
+	particle_trails.emitting = false if not is_sliding and not is_dashing else true  # MODIFIED
 	
 	if is_on_floor():
 		if is_sliding:  
@@ -101,7 +159,10 @@ func player_animations():
 		else:
 			player_sprite.play("Idle")
 	else:
-		player_sprite.play("Jump")
+		if is_dashing:  # NEW
+			player_sprite.play("Dash")  # NEW
+		else:  # NEW
+			player_sprite.play("Jump")
 
 # Flip player sprite based on X velocity
 func flip_player():
